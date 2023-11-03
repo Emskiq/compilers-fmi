@@ -1,21 +1,21 @@
-/*
- *  The scanner definition for COOL.
- */
+  /*
+    *  The scanner definition for COOL.
+  */
 
-/*
- *  Stuff enclosed in %{ %} in the first section is copied verbatim to the
- *  output, so headers and global definitions are placed here to be visible
- * to the code in the file.  Dont remove anything that was here initially
- */
+  /*
+    *  Stuff enclosed in %{ %} in the first section is copied verbatim to the
+    *  output, so headers and global definitions are placed here to be visible
+    * to the code in the file.  Don`t remove anything that was here initially
+  */
+
 %{
 #include <cool-parse.h>
 #include <stringtab.h>
 #include <utilities.h>
 
 /* The compiler assumes these identifiers. */
-#define yylval cool_yylval
 #define yylex  cool_yylex
-
+#define yylval cool_yylval
 /* Max size of string constants */
 #define MAX_STR_CONST 1025
 #define YY_NO_UNPUT   /* keep g++ happy */
@@ -40,17 +40,16 @@ extern int verbose_flag;
 extern YYSTYPE cool_yylval;
 
 /*
- *  My definitions and variables
+ *  Add Your own definitions here
  */
 
 int nr_whitespaces = 0, nr_letter = 0;
 
 %}
 
-/*   ***** FOR THE KEYWORD *******
- *  Except for the constants true and false, keywords are case INSENSITIVE. To conform to the rules for other objects,
- *  the first letter of true and false must be lowercase; the trailing letters may be upper or lower case.
- */
+  /*
+    * Define names for regular expressions here.
+  */
 
 NEW_LINE \n
 WHITESPACE  [\t\n\v\f\r ]
@@ -118,14 +117,10 @@ COMPARISON_LARGER_OR_EQUAL "<="
 ERROR_IGNORE error 
 ERROR . 
 
+%x IN_COMMENT IN_COMMENT_2
+
 %%
- /*
-  *  The multiple-character operators.
-  */
 
-
-
- // {NEW_LINE}   { curr_lineno++; }
 {WHITESPACE} { 
   if (*yytext == '\n') {
     curr_lineno++;
@@ -216,5 +211,16 @@ ERROR .
   cool_yylval.error_msg = yytext;
   return (ERROR); 
 }
+
+"(*" BEGIN(IN_COMMENT);
+"--" BEGIN(IN_COMMENT_2);
+
+<IN_COMMENT>[^*\n]*        /* eat anything that's not a '*' */
+<IN_COMMENT>"*"+[^*/\n]*   /* eat up '*'s not followed by '/'s */
+<IN_COMMENT>\n             ++yylineno;
+<IN_COMMENT>"*"+")"        BEGIN(INITIAL);
+
+<IN_COMMENT_2>[^*\n]*       /* eat anything that's not a '/n' */
+<IN_COMMENT_2>\n             BEGIN(INITIAL);
 
 %%
