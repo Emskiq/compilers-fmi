@@ -43,13 +43,13 @@ extern YYSTYPE cool_yylval;
  *  Add Your own definitions here
  */
 
-int nr_whitespaces = 0, nr_letter = 0;
+int comment_count = 0;
 
 %}
 
   /*
-    * Define names for regular expressions here.
-  */
+   * Define names for regular expressions here.
+   */
 
 NEW_LINE \n
 WHITESPACE  [\t\n\v\f\r ]
@@ -160,12 +160,23 @@ ERROR .
 }
 
  /* Comment recognizing */
+
 --[^\n]*  // eat one line comment
 
-"(*" BEGIN(IN_COMMENT);
+"(*" {
+  comment_count = 1;
+  BEGIN(IN_COMMENT);
+}
 
-<IN_COMMENT>"*)"      BEGIN(INITIAL);
-<IN_COMMENT>[^*\n]+   // eat comment in chunks
+<IN_COMMENT>"*)" {
+  comment_count--;
+  if (comment_count == 0) {
+    BEGIN(INITIAL);
+  }
+}
+
+<IN_COMMENT>"(*"      comment_count++;
+<IN_COMMENT>.         // eat comment
 <IN_COMMENT>"*"       // eat the lone star
 <IN_COMMENT>\n        curr_lineno++;
 <IN_COMMENT><<EOF>> {
@@ -175,7 +186,7 @@ ERROR .
   return ERROR;
 }
 
- /* Define the unmatching comment rule/check before actually read the brackets and * as symbols */
+ /* Unmatching comment rule/check */
 <INITIAL>"*)" {
   cool_yylval.error_msg = "Unmatched *)";
   return ERROR;
