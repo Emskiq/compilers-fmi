@@ -80,8 +80,8 @@ DARROW =>
 NEW ?i:new 
 ISVOID ?i:isvoid 
 
-STR_CONST \"(\\[^btnf\"\\]|[^\n\"\\])*\" 
-INT_CONST -?[0-9]+ 
+STR_CONST \"[^\n]*\"
+INT_CONST [0-9]+ 
 
 TRUE_CONST  t[Rr][Uu][Ee] 
 FALSE_CONST f[Aa][Ll][Ss][Ee] 
@@ -89,7 +89,7 @@ FALSE_CONST f[Aa][Ll][Ss][Ee]
 TYPEID [A-Z][A-Za-z0-9_]* 
 OBJECTID [a-zA-Z][a-zA-Z0-9_]* 
 
-LE le 
+LE <= 
 
 ASSIGN <- 
 NOT ?i:not 
@@ -112,12 +112,11 @@ PRODUCT "*"
 
 COMPARISON_LARGER "<"
 COMPARISON_EQUAL "="
-COMPARISON_LARGER_OR_EQUAL "<="
 
 ERROR_IGNORE error 
 ERROR . 
 
-%x IN_COMMENT IN_COMMENT_2
+%x IN_COMMENT
 
 %%
 
@@ -149,6 +148,7 @@ ERROR .
 {ASSIGN}     { return (ASSIGN); }
 {NOT}        { return (NOT); }
 {DARROW}     { return (DARROW); }
+{LE}         { return (LE); }
 
 {TRUE_CONST}  { 
   cool_yylval.boolean = true;
@@ -157,6 +157,28 @@ ERROR .
 {FALSE_CONST}  { 
   cool_yylval.boolean = false;
   return (BOOL_CONST); 
+}
+
+ /* Comment recognizing */
+--[^\n]*  // eat one line comment
+
+"(*" BEGIN(IN_COMMENT);
+
+<IN_COMMENT>"*)"      BEGIN(INITIAL);
+<IN_COMMENT>[^*\n]+   // eat comment in chunks
+<IN_COMMENT>"*"       // eat the lone star
+<IN_COMMENT>\n        curr_lineno++;
+<IN_COMMENT><<EOF>> {
+  BEGIN(INITIAL);
+  char* error_msg = "EOF in comment!";
+  cool_yylval.error_msg = error_msg;
+  return ERROR;
+}
+
+ /* Define the unmatching comment rule/check before actually read the brackets and * as symbols */
+<INITIAL>"*)" {
+  cool_yylval.error_msg = "Unmatched *)";
+  return ERROR;
 }
 
  /* 
@@ -181,46 +203,35 @@ ERROR .
 
 {COMPARISON_LARGER} { return *yytext; }
 {COMPARISON_EQUAL} { return *yytext; }
-{COMPARISON_LARGER_OR_EQUAL} { return *yytext; }
 
  /* CONSTANTS */
 
 {STR_CONST} { 
-  // TODO
+  cool_yylval.symbol = inttable.add_string(yytext);
+  return STR_CONST;
 }
 
 {INT_CONST} { 
   cool_yylval.symbol = inttable.add_string(yytext);
-  return (INT_CONST);
+  return INT_CONST;
 }
 
  /* IDENTIFIERS */
 {TYPEID}  {
   cool_yylval.symbol = stringtable.add_string(yytext);
-  return (TYPEID);
+  return TYPEID;
 }
 
 {OBJECTID} {
   cool_yylval.symbol = stringtable.add_string(yytext);
-  return (OBJECTID);
+  return OBJECTID;
 }
 
  /* ERROR */
 {ERROR} { 
   char* error_msg = "Cannot match the symbol passed!";
   cool_yylval.error_msg = yytext;
-  return (ERROR); 
+  return ERROR; 
 }
-
-"(*" BEGIN(IN_COMMENT);
-"--" BEGIN(IN_COMMENT_2);
-
-<IN_COMMENT>[^*\n]*        /* eat anything that's not a '*' */
-<IN_COMMENT>"*"+[^*/\n]*   /* eat up '*'s not followed by '/'s */
-<IN_COMMENT>\n             ++yylineno;
-<IN_COMMENT>"*"+")"        BEGIN(INITIAL);
-
-<IN_COMMENT_2>[^*\n]*       /* eat anything that's not a '/n' */
-<IN_COMMENT_2>\n             BEGIN(INITIAL);
 
 %%
