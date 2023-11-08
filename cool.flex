@@ -46,6 +46,7 @@ extern YYSTYPE cool_yylval;
 int comment_count = 0;
 bool escaped_null_char = false;
 bool null_char = false;
+int current_string_len = 0;
 
 %}
 
@@ -226,7 +227,7 @@ EOF <<EOF>>
   }
 }
 
-<IN_COMMENT>.  // eat comment in chunks
+<IN_COMMENT>.         // eat comment
 <IN_COMMENT>"*"       // eat the lone star
 <IN_COMMENT>\n        curr_lineno++;
 <IN_COMMENT><<EOF>> {
@@ -236,18 +237,29 @@ EOF <<EOF>>
   return ERROR;
 }
 
-\"                    string_buf_ptr = string_buf; BEGIN(SINGLE_STRING);
+\"  {
+  string_buf_ptr = string_buf; 
+  current_string_len = 0;
+  BEGIN(SINGLE_STRING);
+}
 
 <SINGLE_STRING>\" {
   BEGIN(INITIAL);
+
   if (escaped_null_char) {
     escaped_null_char = false;
     char* error_msg = "String contains escaped null character.";
     cool_yylval.error_msg = error_msg;
     return ERROR;
-  } else if (null_char) {
+  } 
+  else if (null_char) {
     null_char = false;
     char* error_msg = "String contains null character.";
+    cool_yylval.error_msg = error_msg;
+    return ERROR;
+  }
+  else if (current_string_len >= MAX_STR_CONST) {
+    char* error_msg = "String constant too long";
     cool_yylval.error_msg = error_msg;
     return ERROR;
   }
@@ -258,6 +270,7 @@ EOF <<EOF>>
 
 <SINGLE_STRING>\\\0 {
   escaped_null_char = true;
+  current_string_len++;
 }
 
 <SINGLE_STRING>\n {
@@ -276,25 +289,26 @@ EOF <<EOF>>
 }
 
 <SINGLE_STRING>'\0' {
-  printf("NULLPTR\n");
   null_char = true;
+  current_string_len++;
 }
 
 <SINGLE_STRING>"\\[0-9]+" {
-  printf("NULLPTR []\n");
   *string_buf_ptr++ = yytext[1]; 
 }
 
 <SINGLE_STRING>\\n {
   *string_buf_ptr++ = '\n';
+  current_string_len++;
   ++curr_lineno;
 }
-<SINGLE_STRING>\\t *string_buf_ptr++ = '\t';
-<SINGLE_STRING>\\b *string_buf_ptr++ = '\b';
-<SINGLE_STRING>\\f *string_buf_ptr++ = '\f';
+<SINGLE_STRING>\\t *string_buf_ptr++ = '\t'; current_string_len++;
+<SINGLE_STRING>\\b *string_buf_ptr++ = '\b'; current_string_len++;
+<SINGLE_STRING>\\f *string_buf_ptr++ = '\f'; current_string_len++;
 
 <SINGLE_STRING>{STR_CONST} {
   *string_buf_ptr++ = yytext[1];
+  current_string_len++;
 }
 
 <SINGLE_STRING>\0 {
@@ -305,6 +319,7 @@ EOF <<EOF>>
   char *yptr = yytext;
 
   while ( *yptr ) {
+    current_string_len++;
     *string_buf_ptr++ = *yptr++;
   }
 }
