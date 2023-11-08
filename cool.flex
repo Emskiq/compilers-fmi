@@ -297,7 +297,11 @@ EOF <<EOF>>
   *string_buf_ptr++ = yytext[1];
 }
 
-<SINGLE_STRING>[^\\\n\"]+ {
+<SINGLE_STRING>\0 {
+  null_char = true;
+}
+
+<SINGLE_STRING>[^\\\n\0\"]+ {
   char *yptr = yytext;
 
   while ( *yptr ) {
