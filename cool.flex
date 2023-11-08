@@ -45,11 +45,17 @@ extern YYSTYPE cool_yylval;
 
 int comment_count = 0;
 
+int throw_error_msg(const char* error_msg_arg) {
+  const char* error_msg = error_msg_arg;
+  cool_yylval.error_msg = yytext;
+  return (ERROR);
+}
+
 %}
 
   /*
-   * Define names for regular expressions here.
-   */
+    * Define names for regular expressions here.
+  */
 
 NEW_LINE \n
 WHITESPACE  [\t\n\v\f\r ]
@@ -80,7 +86,7 @@ DARROW =>
 NEW ?i:new 
 ISVOID ?i:isvoid 
 
-STR_CONST \"[^\n]*\"
+STR_CONST \\(.|\n)
 INT_CONST [0-9]+ 
 
 TRUE_CONST  t[Rr][Uu][Ee] 
@@ -114,9 +120,11 @@ COMPARISON_LARGER "<"
 COMPARISON_EQUAL "="
 
 ERROR_IGNORE error 
-ERROR . 
+ERROR .
 
-%x IN_COMMENT
+EOF <<EOF>>
+
+%x IN_COMMENT SINGLE_STRING
 
 %%
 
@@ -159,39 +167,85 @@ ERROR .
   return (BOOL_CONST); 
 }
 
- /* Comment recognizing */
-
 --[^\n]*  // eat one line comment
 
+"*)" {
+  char* error_msg = "Unmatched *)";
+  cool_yylval.error_msg = error_msg;
+  return (ERROR);
+}
+
 "(*" {
-  comment_count = 1;
+  ++comment_count;
   BEGIN(IN_COMMENT);
 }
 
-<IN_COMMENT>"*)" {
-  comment_count--;
+<IN_COMMENT>"(*"     ++comment_count;
+
+<IN_COMMENT>"*)"  {
+  comment_count++;
   if (comment_count == 0) {
     BEGIN(INITIAL);
   }
 }
 
-<IN_COMMENT>"(*"      comment_count++;
-<IN_COMMENT>.         // eat comment
+<IN_COMMENT>[^*\n]+   // eat comment in chunks
 <IN_COMMENT>"*"       // eat the lone star
 <IN_COMMENT>\n        curr_lineno++;
 <IN_COMMENT><<EOF>> {
   BEGIN(INITIAL);
-  char* error_msg = "EOF in comment!";
+  char* error_msg = "EOF in comment";
   cool_yylval.error_msg = error_msg;
   return ERROR;
 }
 
- /* Unmatching comment rule/check */
-<INITIAL>"*)" {
-  cool_yylval.error_msg = "Unmatched *)";
+\"                    string_buf_ptr = string_buf; BEGIN(SINGLE_STRING);
+
+<SINGLE_STRING>\n {
+  BEGIN(INITIAL);
+  char* error_msg = "Unterminated string constant";
+  cool_yylval.error_msg = error_msg;
+  return (ERROR);
+}
+
+<SINGLE_STRING><<EOF>> {
+  BEGIN(INITIAL);
+  char* error_msg = "EOF in string constant";
+  cool_yylval.error_msg = error_msg;
   return ERROR;
 }
 
+<SINGLE_STRING>\\0 *string_buf_ptr++ = '0';
+
+<SINGLE_STRING>\\[0-9]+ {
+  *string_buf_ptr++ = yytext[1]; 
+}
+
+<SINGLE_STRING>\\n *string_buf_ptr++ = '\n';
+<SINGLE_STRING>\\t *string_buf_ptr++ = '\t';
+<SINGLE_STRING>\\r *string_buf_ptr++ = '\r';
+<SINGLE_STRING>\\b *string_buf_ptr++ = '\b';
+<SINGLE_STRING>\\f *string_buf_ptr++ = '\f';
+
+<SINGLE_STRING>{STR_CONST} {
+  *string_buf_ptr++ = yytext[1];
+}
+
+<SINGLE_STRING>[^\\\n\"]+ {
+  char *yptr = yytext;
+
+  while ( *yptr ) {
+    *string_buf_ptr++ = *yptr++;
+  }
+}
+
+<SINGLE_STRING>\" {
+  BEGIN(INITIAL);
+  *string_buf_ptr = '\0';
+  printf("%s", string_buf_ptr);
+  cool_yylval.symbol = stringtable.add_string(string_buf);
+  return (STR_CONST);
+}
  /* 
   * Symbols - brackets, semicolon, operands
   */
@@ -217,32 +271,28 @@ ERROR .
 
  /* CONSTANTS */
 
-{STR_CONST} { 
-  cool_yylval.symbol = inttable.add_string(yytext);
-  return STR_CONST;
-}
-
 {INT_CONST} { 
   cool_yylval.symbol = inttable.add_string(yytext);
-  return INT_CONST;
+  return (INT_CONST);
 }
 
  /* IDENTIFIERS */
 {TYPEID}  {
   cool_yylval.symbol = stringtable.add_string(yytext);
-  return TYPEID;
+  return (TYPEID);
 }
 
 {OBJECTID} {
   cool_yylval.symbol = stringtable.add_string(yytext);
-  return OBJECTID;
+  return (OBJECTID);
 }
 
- /* ERROR */
+  /* ERROR */
+
 {ERROR} { 
   char* error_msg = "Cannot match the symbol passed!";
-  cool_yylval.error_msg = yytext;
-  return ERROR; 
+  cool_yylval.error_msg = error_msg;
+  return (ERROR); 
 }
 
 %%
