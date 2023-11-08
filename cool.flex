@@ -217,7 +217,7 @@ EOF <<EOF>>
 --[^\n]*  // eat one line comment
 
 "(*" {
-  ++comment_count;
+  comment_count = 1;
   BEGIN(IN_COMMENT);
 }
 
@@ -230,7 +230,7 @@ EOF <<EOF>>
   }
 }
 
-<IN_COMMENT>[^*\n]+   // eat comment in chunks
+<IN_COMMENT>.         // eat comment in chunks
 <IN_COMMENT>"*"       // eat the lone star
 <IN_COMMENT>\n        curr_lineno++;
 <IN_COMMENT><<EOF>> {
@@ -240,10 +240,11 @@ EOF <<EOF>>
   return ERROR;
 }
 
-\"                    string_buf_ptr = string_buf; BEGIN(SINGLE_STRING);
+\" string_buf_ptr = string_buf; BEGIN(SINGLE_STRING);
 
 <SINGLE_STRING>\n {
   BEGIN(INITIAL);
+  curr_lineno++;
   char* error_msg = "Unterminated string constant";
   cool_yylval.error_msg = error_msg;
   return (ERROR);
@@ -262,7 +263,10 @@ EOF <<EOF>>
   *string_buf_ptr++ = yytext[1]; 
 }
 
-<SINGLE_STRING>\\n *string_buf_ptr++ = '\n';
+<SINGLE_STRING>\\n {
+  *string_buf_ptr++ = '\n';
+  curr_lineno++;
+}
 <SINGLE_STRING>\\t *string_buf_ptr++ = '\t';
 <SINGLE_STRING>\\r *string_buf_ptr++ = '\r';
 <SINGLE_STRING>\\b *string_buf_ptr++ = '\b';
@@ -289,9 +293,8 @@ EOF <<EOF>>
 }
   /* ERROR */
 
-{ERROR} { 
-  char* error_msg = "Cannot match the symbol passed!";
-  cool_yylval.error_msg = error_msg;
+{ERROR} {
+  cool_yylval.error_msg = yytext;;
   return (ERROR); 
 }
 
