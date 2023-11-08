@@ -167,13 +167,54 @@ EOF <<EOF>>
   return (BOOL_CONST); 
 }
 
---[^\n]*  // eat one line comment
+ /* 
+  * Symbols - brackets, semicolon, operands
+  */
+{BRACKETS} { return *yytext; }
+
+{SEMICOLON} { return *yytext; }
+{COMMA} { return *yytext; }
+
+{DOT} { return *yytext; }
+{TWO_DOTS} { return *yytext; }
+
+{AT} { return *yytext; }
+{TILDE} { return *yytext; }
+
+{PLUS} { return *yytext; }
+{MINUS} { return *yytext; }
+
+{DEVISION} { return *yytext; }
+{PRODUCT} { return *yytext; }
+
+{COMPARISON_LARGER} { return *yytext; }
+{COMPARISON_EQUAL} { return *yytext; }
+
+ /* CONSTANTS */
+
+{INT_CONST} { 
+  cool_yylval.symbol = inttable.add_string(yytext);
+  return (INT_CONST);
+}
+
+ /* IDENTIFIERS */
+{TYPEID}  {
+  cool_yylval.symbol = stringtable.add_string(yytext);
+  return (TYPEID);
+}
+
+{OBJECTID} {
+  cool_yylval.symbol = stringtable.add_string(yytext);
+  return (OBJECTID);
+}
 
 "*)" {
   char* error_msg = "Unmatched *)";
   cool_yylval.error_msg = error_msg;
   return (ERROR);
 }
+
+--[^\n]*  // eat one line comment
 
 "(*" {
   ++comment_count;
@@ -183,7 +224,7 @@ EOF <<EOF>>
 <IN_COMMENT>"(*"     ++comment_count;
 
 <IN_COMMENT>"*)"  {
-  comment_count++;
+  --comment_count;
   if (comment_count == 0) {
     BEGIN(INITIAL);
   }
@@ -246,47 +287,6 @@ EOF <<EOF>>
   cool_yylval.symbol = stringtable.add_string(string_buf);
   return (STR_CONST);
 }
- /* 
-  * Symbols - brackets, semicolon, operands
-  */
-{BRACKETS} { return *yytext; }
-
-{SEMICOLON} { return *yytext; }
-{COMMA} { return *yytext; }
-
-{DOT} { return *yytext; }
-{TWO_DOTS} { return *yytext; }
-
-{AT} { return *yytext; }
-{TILDE} { return *yytext; }
-
-{PLUS} { return *yytext; }
-{MINUS} { return *yytext; }
-
-{DEVISION} { return *yytext; }
-{PRODUCT} { return *yytext; }
-
-{COMPARISON_LARGER} { return *yytext; }
-{COMPARISON_EQUAL} { return *yytext; }
-
- /* CONSTANTS */
-
-{INT_CONST} { 
-  cool_yylval.symbol = inttable.add_string(yytext);
-  return (INT_CONST);
-}
-
- /* IDENTIFIERS */
-{TYPEID}  {
-  cool_yylval.symbol = stringtable.add_string(yytext);
-  return (TYPEID);
-}
-
-{OBJECTID} {
-  cool_yylval.symbol = stringtable.add_string(yytext);
-  return (OBJECTID);
-}
-
   /* ERROR */
 
 {ERROR} { 
