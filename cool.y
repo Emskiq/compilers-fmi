@@ -132,14 +132,20 @@
 %type <program> program
 %type <classes> class_list
 %type <class_> class
-    
- /* You will want to change the following line. */
-%type <features> dummy_feature_list
+
+%type <case_> case
+%type <cases> case_list
+
+%type <feature> feature
+%type <features> feature_list
+
+%type <expression> expr
+%type <expressions> expr_list
     
 /* Precedence declarations go here. */
     
-    
 %%
+  ////// GRAMMAR RULES //////
   /* 
     Save the root of the abstract syntax tree in a global variable.
   */
@@ -157,15 +163,46 @@ class_list  : class {
 
   /* If no parent is specified, the class inherits from the Object class. */
 class	          
-        : CLASS TYPEID '{' dummy_feature_list '}' ';' { 
-                                                        $$ = class_($2, idtable.add_string("Object"), $4, stringtable.add_string(curr_filename)); 
-                                                      }
-        | CLASS TYPEID INHERITS TYPEID '{' dummy_feature_list '}' ';' { 
-                                                        $$ = class_($2,$4,$6,stringtable.add_string(curr_filename)); 
-                                                      };
-  
-  
-dummy_feature_list  :	{  $$ = nil_Features(); };
+        : CLASS TYPEID '{' feature_list '}' ';' 
+          { $$ = class_($2, idtable.add_string("Object"), $4, stringtable.add_string(curr_filename)); }
+        | CLASS TYPEID INHERITS TYPEID '{' feature_list '}' ';' 
+          { $$ = class_($2,$4,$6,stringtable.add_string(curr_filename)); };
+
+
+feature_list  :	feature 
+                  {
+                    $$ = single_Features($1);
+                  }
+              | feature_list feature 
+                  {
+                    $$ = append_Features($1, single_Features($2));
+                  };
+
+feature  
+        : OBJECTID ':' TYPEID ASSIGN expr
+            { $$ = attr($1, $3, $5); };
+
+expr_list : expr 
+              {
+                $$ = single_Expressions($1);
+              }
+          | expr_list expr
+              {
+                $$ = append_Expressions($1, single_Expressions($2));
+              };
+
+expr 
+      : TYPEID
+          { $$ = object($1); }
+      | BOOL_CONST
+          { $$ = bool_const($1); }
+      | INT_CONST
+          { $$ = int_const($1); }
+      | STR_CONST
+          { $$ = string_const($1); };
+       /// TODO:    
+      // | IF expr THEN expr ELSE expr FI
+      //     { $$ = cond($1, $2, $3); };
   
 
 /* end of grammar */
