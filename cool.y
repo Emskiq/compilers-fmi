@@ -130,6 +130,7 @@
     
     /* Declare types for the grammar's non-terminals. */
 %type <program> program
+
 %type <classes> class_list
 %type <class_> class
 
@@ -137,73 +138,306 @@
 %type <cases> case_list
 
 %type <feature> feature
-%type <features> feature_list
+%type <features> feature_list_asterisk
+%type <features> feature_list_plus
 
 %type <expression> expr
-%type <expressions> expr_list
+%type <expressions> expr_list_asterisk
+%type <expressions> expr_list_plus
+
+%type <formal> formal
+%type <formals> formal_list_asterisk
+%type <formals> formal_list_plus
+
+%type <expression> while_expression
+%type <expression> inner_let
+%type <expression> nonempty_expression
+
     
 /* Precedence declarations go here. */
+
+%left ISVOID
+%left ASSIGN
+%left NOT
+%nonassoc LE '<' '='
+%left '*' '/'
+%left '+' '-'
+%left '~'
+%left '@'
+%left '.'
     
 %%
   ////// GRAMMAR RULES //////
   /* 
     Save the root of the abstract syntax tree in a global variable.
   */
-program	: class_list {  
-                        @$ = @1; ast_root = program($1); 
-                     };
+program	: class_list 
+          {  
+            @$ = @1; ast_root = program($1); 
+          };
   
-class_list  : class { 
-                      $$ = single_Classes($1); 
-                      parse_results = $$; 
-                    }
-            | class_list class { 
-                                  $$ = append_Classes($1,single_Classes($2)); parse_results = $$; 
-                                };
-
-  /* If no parent is specified, the class inherits from the Object class. */
-class	          
-        : CLASS TYPEID '{' feature_list '}' ';' 
-          { $$ = class_($2, idtable.add_string("Object"), $4, stringtable.add_string(curr_filename)); }
-        | CLASS TYPEID INHERITS TYPEID '{' feature_list '}' ';' 
-          { $$ = class_($2,$4,$6,stringtable.add_string(curr_filename)); };
-
-
-feature_list  :	feature 
-                  {
-                    $$ = single_Features($1);
-                  }
-              | feature_list feature 
-                  {
-                    $$ = append_Features($1, single_Features($2));
-                  };
-
-feature  
-        : OBJECTID ':' TYPEID ASSIGN expr
-            { $$ = attr($1, $3, $5); };
-
-expr_list : expr 
-              {
-                $$ = single_Expressions($1);
+class_list  : class 
+              { 
+                $$ = single_Classes($1); 
+                parse_results = $$; 
               }
-          | expr_list expr
-              {
-                $$ = append_Expressions($1, single_Expressions($2));
+            | class_list class 
+              { 
+                $$ = append_Classes($1,single_Classes($2)); parse_results = $$; 
               };
 
-expr 
-      : TYPEID
-          { $$ = object($1); }
-      | BOOL_CONST
-          { $$ = bool_const($1); }
-      | INT_CONST
-          { $$ = int_const($1); }
-      | STR_CONST
-          { $$ = string_const($1); };
-       /// TODO:    
-      // | IF expr THEN expr ELSE expr FI
-      //     { $$ = cond($1, $2, $3); };
-  
+  /* If no parent is specified, the class inherits from the Object class. */
+class	: CLASS TYPEID '{' feature_list_asterisk '}' ';' 
+        { 
+          $$ = class_($2, idtable.add_string("Object"), $4, stringtable.add_string(curr_filename)); 
+        }
+      | CLASS TYPEID INHERITS TYPEID '{' feature_list_asterisk '}' ';' 
+        { 
+          $$ = class_($2,$4,$6,stringtable.add_string(curr_filename)); 
+        }
+      | ERROR
+        {
+
+        };
+
+
+feature_list_asterisk : feature_list_plus 
+                        {
+
+                        }
+                      | 
+                        {
+                          // nil
+                        };
+
+feature_list_plus : feature ';' feature_list_plus
+                    {
+
+                    }
+                  | feature 
+                    {
+
+                    };
+
+feature : OBJECTID '(' formal_list_asterisk ')' ':' TYPEID '{' expr_list_asterisk '}'
+          {
+
+          }
+        | OBJECTID ':' TYPEID ASSIGN expr
+          {
+
+          }
+        | OBJECTID ':' TYPEID
+          {
+
+          }
+        | ERROR
+          {
+
+          };
+
+formal_list_asterisk  : formal_list_plus
+                        {
+
+                        }
+                      |
+                        {
+
+                        };
+
+formal_list_plus  : formal ',' formal_list_plus
+                    {
+
+                    }
+                  | formal 
+                    {
+
+                    };
+
+formal  : OBJECTID ':' TYPEID
+          {
+
+          };
+
+expr_list_asterisk  : expr_list_asterisk ',' nonempty_expression
+                      {
+
+                      }
+                    | nonempty_expression 
+                      {
+
+                      }
+                    | 
+                      {
+
+                      };
+
+expr_list_plus  : nonempty_expression ';'
+                  {
+
+                  }
+                | nonempty_expression ';' expr_list_plus
+                  {
+
+                  }
+                | ERROR
+                  {
+
+                  };
+
+expr  : nonempty_expression
+        {
+
+        }
+      |
+        {
+
+        };
+
+nonempty_expression : OBJECTID ASSIGN nonempty_expression
+                      {
+
+                      }
+                    | nonempty_expression '@' TYPEID '.' OBJECTID '(' expr_list_asterisk ')' 
+                      {
+
+                      }
+                    | nonempty_expression '.' OBJECTID '(' expr_list_asterisk ')'
+                      {
+
+                      }
+                    | OBJECTID '(' expr_list_asterisk ')'
+                      {
+
+                      }
+                    | IF nonempty_expression THEN nonempty_expression ELSE nonempty_expression FI
+                      {
+
+                      }
+                    | while_expression
+                      {
+
+                      }
+                    | '{' expr_list_plus '}'
+                      {
+
+                      }
+                    | LET inner_let
+                      {
+
+                      }
+                    | CASE nonempty_expression OF case_list ESAC
+                      {
+
+                      }
+                    | NEW TYPEID
+                      {
+
+                      }
+                    | ISVOID nonempty_expression
+                      {
+
+                      }
+                    | nonempty_expression '+' nonempty_expression
+                      {
+
+                      }
+                    | nonempty_expression '-' nonempty_expression
+                      {
+
+                      }
+                    | nonempty_expression '*' nonempty_expression
+                      {
+
+                      }
+                    | nonempty_expression '/' nonempty_expression
+                      {
+
+                      }
+                    | nonempty_expression '<' nonempty_expression
+                      {
+
+                      }
+                    | nonempty_expression '=' nonempty_expression
+                      {
+
+                      }
+                    | nonempty_expression LE nonempty_expression
+                      {
+
+                      }
+                    | '~' nonempty_expression
+                      {
+
+                      }
+                    | NOT nonempty_expression
+                      {
+
+                      }
+                    | '(' nonempty_expression ')'
+                      {
+
+                      }
+                    | OBJECTID
+                      {
+
+                      }
+                    | BOOL_CONST
+                      {
+
+                      }
+                    | INT_CONST
+                      {
+
+                      }
+                    | STR_CONST
+                      {
+
+                      }
+                    | ERROR
+                      {
+
+                      };
+
+while_expression  : WHILE nonempty_expression LOOP expr POOL
+                    {
+
+                    }
+                  | WHILE nonempty_expression LOOP ERROR
+                    {
+
+                    };
+
+case_list : case_list case ';'
+            {
+
+            }
+          | case ';'
+            {
+
+            };
+
+case  : OBJECTID ':' TYPEID DARROW expr
+        {
+
+        };
+
+inner_let : OBJECTID ':' TYPEID ASSIGN expr IN expr
+            {
+
+            }
+          | OBJECTID ':' TYPEID IN expr
+            {
+
+            }
+          | OBJECTID ':' TYPEID ASSIGN expr ',' inner_let
+            {
+
+            }
+          | OBJECTID ':' TYPEID ',' inner_let
+            {
+
+            };
 
 /* end of grammar */
 %%
@@ -221,5 +455,3 @@ void yyerror(char *s)
   
   if(omerrs>50) {fprintf(stdout, "More than 50 errors\n"); exit(1);}
 }
-    
-    
