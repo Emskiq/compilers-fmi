@@ -68,6 +68,52 @@
     // construct the result node:
     $$ = plus(int_const($1), int_const($3));
   }
+
+Classes nil_Classes();
+Classes single_Classes(Class_);
+Classes append_Classes(Classes, Classes);
+Features nil_Features();
+Features single_Features(Feature);
+Features append_Features(Features, Features);
+Formals nil_Formals();
+Formals single_Formals(Formal);
+Formals append_Formals(Formals, Formals);
+Expressions nil_Expressions();
+Expressions single_Expressions(Expression);
+Expressions append_Expressions(Expressions, Expressions);
+Cases nil_Cases();
+Cases single_Cases(Case);
+Cases append_Cases(Cases, Cases);
+Program program(Classes);
+Class_ class_(Symbol, Symbol, Features, Symbol);
+Feature method(Symbol, Formals, Symbol, Expression);
+Feature attr(Symbol, Symbol, Expression);
+Formal formal(Symbol, Symbol);
+Case branch(Symbol, Symbol, Expression);
+Expression assign(Symbol, Expression);
+Expression static_dispatch(Expression, Symbol, Symbol, Expressions);
+Expression dispatch(Expression, Symbol, Expressions);
+Expression cond(Expression, Expression, Expression);
+Expression loop(Expression, Expression);
+Expression typcase(Expression, Cases);
+Expression block(Expressions);
+Expression let(Symbol, Symbol, Expression, Expression);
+Expression plus(Expression, Expression);
+Expression sub(Expression, Expression);
+Expression mul(Expression, Expression);
+Expression divide(Expression, Expression);
+Expression neg(Expression);
+Expression lt(Expression, Expression);
+Expression eq(Expression, Expression);
+Expression leq(Expression, Expression);
+Expression comp(Expression);
+Expression int_const(Symbol);
+Expression bool_const(Boolean);
+Expression string_const(Symbol);
+Expression new_(Symbol);
+Expression isvoid(Expression);
+Expression no_expr();
+Expression object(Symbol);
   
   */
   
@@ -203,37 +249,37 @@ class	: CLASS TYPEID '{' feature_list_asterisk '}' ';'
 
 feature_list_asterisk : feature_list_plus 
                         {
-
+                          $$ = $1; 
                         }
                       | 
                         {
-                          // nil
+                          $$ = nil_Features();
                         };
 
 feature_list_plus : feature ';' feature_list_plus
                     {
-
+                      $$ = append_Features(single_Features($1), $3);
                     }
                   | feature 
                     {
-
+                      $$ = single_Features($1);
                     };
 
 feature : OBJECTID '(' formal_list_asterisk ')' ':' TYPEID '{' expr_list_asterisk '}'
           {
-
+            $$ = method($1, $3, $6, $8);
           }
         | OBJECTID ':' TYPEID ASSIGN expr
           {
-
+            $$ = attr($1, $3, $5);
           }
         | OBJECTID ':' TYPEID
           {
-
+            $$ = attr($1, $3, no_expr());
           }
         | ERROR
           {
-
+            
           };
 
 formal_list_asterisk  : formal_list_plus
@@ -455,3 +501,5 @@ void yyerror(char *s)
   
   if(omerrs>50) {fprintf(stdout, "More than 50 errors\n"); exit(1);}
 }
+    
+    
