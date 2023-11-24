@@ -254,7 +254,9 @@ feature_list_asterisk : feature_list_plus
                       | 
                         {
                           $$ = nil_Features();
-                        };
+                        }
+                        
+                        ;
 
 feature_list_plus : feature ';' feature_list_plus
                     {
@@ -263,9 +265,11 @@ feature_list_plus : feature ';' feature_list_plus
                   | feature 
                     {
                       $$ = single_Features($1);
-                    };
+                    }
+                    
+                    ;
 
-feature : OBJECTID '(' formal_list_asterisk ')' ':' TYPEID '{' expr_list_asterisk '}'
+feature : OBJECTID '(' formal_list_asterisk ')' ':' TYPEID '{' nonempty_expression '}'
           {
             $$ = method($1, $3, $6, $8);
           }
@@ -278,212 +282,211 @@ feature : OBJECTID '(' formal_list_asterisk ')' ':' TYPEID '{' expr_list_asteris
             $$ = attr($1, $3, no_expr());
           }
         | ERROR
-          {
-            
-          };
+          
+          ;
 
 formal_list_asterisk  : formal_list_plus
                         {
-
+                          $$ = $1;
                         }
                       |
                         {
-
+                          $$ = nil_Formals();
                         };
 
 formal_list_plus  : formal ',' formal_list_plus
                     {
-
+                      $$ = append_Formals(single_Formals($1), $3);
                     }
                   | formal 
                     {
-
+                      $$ = single_Formals($1);
                     };
 
 formal  : OBJECTID ':' TYPEID
           {
-
+            $$ = formal($1, $3);
           };
 
 expr_list_asterisk  : expr_list_asterisk ',' nonempty_expression
                       {
-
+                        $$ = append_Expressions(single_Expressions($3), $1);
                       }
                     | nonempty_expression 
                       {
-
+                        $$ = single_Expressions($1);
                       }
                     | 
                       {
-
+                        $$ = nil_Expressions();
                       };
 
 expr_list_plus  : nonempty_expression ';'
                   {
-
+                    $$ = single_Expressions($1);
                   }
                 | nonempty_expression ';' expr_list_plus
                   {
-
+                    $$ = append_Expressions(single_Expressions($1), $3);
                   }
                 | ERROR
-                  {
-
-                  };
-
-expr  : nonempty_expression
-        {
-
-        }
-      |
-        {
-
-        };
-
-nonempty_expression : OBJECTID ASSIGN nonempty_expression
-                      {
-
-                      }
-                    | nonempty_expression '@' TYPEID '.' OBJECTID '(' expr_list_asterisk ')' 
-                      {
-
-                      }
-                    | nonempty_expression '.' OBJECTID '(' expr_list_asterisk ')'
-                      {
-
-                      }
-                    | OBJECTID '(' expr_list_asterisk ')'
-                      {
-
-                      }
-                    | IF nonempty_expression THEN nonempty_expression ELSE nonempty_expression FI
-                      {
-
-                      }
-                    | while_expression
-                      {
-
-                      }
-                    | '{' expr_list_plus '}'
-                      {
-
-                      }
-                    | LET inner_let
-                      {
-
-                      }
-                    | CASE nonempty_expression OF case_list ESAC
-                      {
-
-                      }
-                    | NEW TYPEID
-                      {
-
-                      }
-                    | ISVOID nonempty_expression
-                      {
-
-                      }
-                    | nonempty_expression '+' nonempty_expression
-                      {
-
-                      }
-                    | nonempty_expression '-' nonempty_expression
-                      {
-
-                      }
-                    | nonempty_expression '*' nonempty_expression
-                      {
-
-                      }
-                    | nonempty_expression '/' nonempty_expression
-                      {
-
-                      }
-                    | nonempty_expression '<' nonempty_expression
-                      {
-
-                      }
-                    | nonempty_expression '=' nonempty_expression
-                      {
-
-                      }
-                    | nonempty_expression LE nonempty_expression
-                      {
-
-                      }
-                    | '~' nonempty_expression
-                      {
-
-                      }
-                    | NOT nonempty_expression
-                      {
-
-                      }
-                    | '(' nonempty_expression ')'
-                      {
-
-                      }
-                    | OBJECTID
-                      {
-
-                      }
-                    | BOOL_CONST
-                      {
-
-                      }
-                    | INT_CONST
-                      {
-
-                      }
-                    | STR_CONST
-                      {
-
-                      }
-                    | ERROR
-                      {
-
-                      };
-
-while_expression  : WHILE nonempty_expression LOOP expr POOL
-                    {
-
-                    }
-                  | WHILE nonempty_expression LOOP ERROR
-                    {
-
-                    };
-
+                
+                ;
+  // Cases
 case_list : case_list case ';'
             {
-
+              $$ = append_Cases($1, single_Cases($2));
             }
           | case ';'
             {
-
+              $$ = single_Cases($1);
             };
 
 case  : OBJECTID ':' TYPEID DARROW expr
         {
-
+          
+          $$ = branch($1, $3, $5);
         };
-
+        
+  // Let
 inner_let : OBJECTID ':' TYPEID ASSIGN expr IN expr
             {
-
+              $$ = let($1, $3, $5, $7);
             }
           | OBJECTID ':' TYPEID IN expr
             {
-
+              $$ = let($1, $3, no_expr(), $5);
             }
           | OBJECTID ':' TYPEID ASSIGN expr ',' inner_let
             {
-
+              $$ = let($1, $3, $5, $7);
             }
           | OBJECTID ':' TYPEID ',' inner_let
             {
-
+              $$ = let($1, $3, no_expr(), $5);
             };
+
+expr  : nonempty_expression
+        {
+          $$ = $1;
+        }
+      |
+        {
+          $$ = no_expr();
+        };
+
+nonempty_expression : OBJECTID ASSIGN nonempty_expression
+                      {
+                        $$ = assign($1, $3);
+                      }
+                    | nonempty_expression '@' TYPEID '.' OBJECTID '(' expr_list_asterisk ')' 
+                      {
+                        $$ = static_dispatch($1, $3, $5, $7);
+                      }
+                    | nonempty_expression '.' OBJECTID '(' expr_list_asterisk ')'
+                      {
+                        dispatch($1, $3, $5);
+                      }
+                    | OBJECTID '(' expr_list_asterisk ')'
+                      {
+                        $$ = dispatch(object(idtable.add_string("self")), $1, $3);
+                      }
+                    | IF nonempty_expression THEN nonempty_expression ELSE nonempty_expression FI
+                      {
+                        $$ = cond($2, $4, $6);
+                      }
+                    | while_expression
+                      {
+                        $$ = $1;
+                      }
+                    | '{' expr_list_plus '}'
+                      {
+                        $$ = block($2);
+                      }
+                    | LET inner_let
+                      {
+                        $$ = $2;
+                      }
+                    | CASE nonempty_expression OF case_list ESAC
+                      {
+                        $$ = typcase($2, $4);
+                      }
+                    | NEW TYPEID
+                      {
+                        $$ = new_($2);
+                      }
+                    | ISVOID nonempty_expression
+                      {
+                        $$ = isvoid($2);
+                      }
+                    | nonempty_expression '+' nonempty_expression
+                      {
+                        $$ = plus($1, $3);
+                      }
+                    | nonempty_expression '-' nonempty_expression
+                      {
+                        $$ = sub($1, $3);
+                      }
+                    | nonempty_expression '*' nonempty_expression
+                      {
+                        $$ = mul($1, $3);
+                      }
+                    | nonempty_expression '/' nonempty_expression
+                      {
+                        $$ = divide($1, $3);
+                      }
+                    | '~' nonempty_expression
+                      {
+                        $$ = neg($2);
+                      }
+                    | nonempty_expression '<' nonempty_expression
+                      {
+                        $$ = lt($1, $3);
+                      }
+                    | nonempty_expression LE nonempty_expression
+                      {
+                        $$ = leq($1, $3);
+                      }
+                    | nonempty_expression '=' nonempty_expression
+                      {
+                        $$ = eq($1, $3);
+                      }
+                    | NOT nonempty_expression
+                      {
+                        $$ = comp($2);
+                      }
+                    | '(' nonempty_expression ')'
+                      {
+                        $$ = $2;
+                      }
+                    | OBJECTID
+                      {
+                        $$ = object($1);
+                      }
+                    | BOOL_CONST
+                      {
+                        $$ = bool_const($1);
+                      }
+                    | INT_CONST
+                      {
+                        $$ = int_const($1);
+                      }
+                    | STR_CONST
+                      {
+                        $$ = string_const($1);
+                      }
+                    | ERROR 
+                    
+                    ;
+
+while_expression  : WHILE nonempty_expression LOOP expr POOL
+                    {
+                      loop($2, $4);
+                    }
+                  | WHILE nonempty_expression LOOP ERROR
+                    {
+                      
+                    };
 
 /* end of grammar */
 %%
