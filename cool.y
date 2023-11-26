@@ -68,52 +68,6 @@
     // construct the result node:
     $$ = plus(int_const($1), int_const($3));
   }
-
-Classes nil_Classes();
-Classes single_Classes(Class_);
-Classes append_Classes(Classes, Classes);
-Features nil_Features();
-Features single_Features(Feature);
-Features append_Features(Features, Features);
-Formals nil_Formals();
-Formals single_Formals(Formal);
-Formals append_Formals(Formals, Formals);
-Expressions nil_Expressions();
-Expressions single_Expressions(Expression);
-Expressions append_Expressions(Expressions, Expressions);
-Cases nil_Cases();
-Cases single_Cases(Case);
-Cases append_Cases(Cases, Cases);
-Program program(Classes);
-Class_ class_(Symbol, Symbol, Features, Symbol);
-Feature method(Symbol, Formals, Symbol, Expression);
-Feature attr(Symbol, Symbol, Expression);
-Formal formal(Symbol, Symbol);
-Case branch(Symbol, Symbol, Expression);
-Expression assign(Symbol, Expression);
-Expression static_dispatch(Expression, Symbol, Symbol, Expressions);
-Expression dispatch(Expression, Symbol, Expressions);
-Expression cond(Expression, Expression, Expression);
-Expression loop(Expression, Expression);
-Expression typcase(Expression, Cases);
-Expression block(Expressions);
-Expression let(Symbol, Symbol, Expression, Expression);
-Expression plus(Expression, Expression);
-Expression sub(Expression, Expression);
-Expression mul(Expression, Expression);
-Expression divide(Expression, Expression);
-Expression neg(Expression);
-Expression lt(Expression, Expression);
-Expression eq(Expression, Expression);
-Expression leq(Expression, Expression);
-Expression comp(Expression);
-Expression int_const(Symbol);
-Expression bool_const(Boolean);
-Expression string_const(Symbol);
-Expression new_(Symbol);
-Expression isvoid(Expression);
-Expression no_expr();
-Expression object(Symbol);
   
   */
   
@@ -202,12 +156,12 @@ Expression object(Symbol);
     
 /* Precedence declarations go here. */
 
-%left ISVOID
 %left ASSIGN
 %left NOT
 %nonassoc LE '<' '='
-%left '*' '/'
 %left '+' '-'
+%left '*' '/'
+%left ISVOID
 %left '~'
 %left '@'
 %left '.'
@@ -262,7 +216,7 @@ feature_list_plus : feature ';' feature_list_plus
                     {
                       $$ = append_Features(single_Features($1), $3);
                     }
-                  | feature 
+                  | feature ';'
                     {
                       $$ = single_Features($1);
                     }
@@ -385,7 +339,7 @@ nonempty_expression : OBJECTID ASSIGN nonempty_expression
                       }
                     | nonempty_expression '.' OBJECTID '(' expr_list_asterisk ')'
                       {
-                        dispatch($1, $3, $5);
+                        $$ = dispatch($1, $3, $5);
                       }
                     | OBJECTID '(' expr_list_asterisk ')'
                       {
@@ -481,7 +435,7 @@ nonempty_expression : OBJECTID ASSIGN nonempty_expression
 
 while_expression  : WHILE nonempty_expression LOOP expr POOL
                     {
-                      loop($2, $4);
+                      $$ = loop($2, $4);
                     }
                   | WHILE nonempty_expression LOOP ERROR
                     {
