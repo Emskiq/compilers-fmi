@@ -138,6 +138,8 @@
 %type <cases> case_list
 
 %type <feature> feature
+%type <feature> method_declaration
+%type <feature> attribute_declaration
 %type <features> feature_list_asterisk
 %type <features> feature_list_plus
 
@@ -156,7 +158,7 @@
     
 /* Precedence declarations go here. */
 
-%left ASSIGN
+%right ASSIGN
 %left NOT
 %nonassoc LE '<' '='
 %left '+' '-'
@@ -183,8 +185,10 @@ class_list  : class
               }
             | class_list class 
               { 
-                $$ = append_Classes($1,single_Classes($2)); parse_results = $$; 
-              };
+                $$ = append_Classes($1,single_Classes($2)); 
+                parse_results = $$; 
+              }
+            
 
   /* If no parent is specified, the class inherits from the Object class. */
 class	: CLASS TYPEID '{' feature_list_asterisk '}' ';' 
@@ -195,8 +199,8 @@ class	: CLASS TYPEID '{' feature_list_asterisk '}' ';'
         { 
           $$ = class_($2,$4,$6,stringtable.add_string(curr_filename)); 
         }
-      | ERROR
-        {
+      | error ';' 
+        { 
 
         };
 
@@ -208,36 +212,44 @@ feature_list_asterisk : feature_list_plus
                       | 
                         {
                           $$ = nil_Features();
-                        }
-                        
-                        ;
+                        };
 
-feature_list_plus : feature ';' feature_list_plus
+feature_list_plus : feature_list_plus feature
                     {
-                      $$ = append_Features(single_Features($1), $3);
+                      $$ = append_Features($1, single_Features($2));
                     }
-                  | feature ';'
+                  | feature
                     {
                       $$ = single_Features($1);
-                    }
-                    
-                    ;
+                    };
 
-feature : OBJECTID '(' formal_list_asterisk ')' ':' TYPEID '{' nonempty_expression '}'
+feature : method_declaration ';'
           {
-            $$ = method($1, $3, $6, $8);
+            $$ = $1;
           }
-        | OBJECTID ':' TYPEID ASSIGN expr
+        | attribute_declaration ';'
           {
-            $$ = attr($1, $3, $5);
+            $$ = $1;
           }
-        | OBJECTID ':' TYPEID
-          {
-            $$ = attr($1, $3, no_expr());
-          }
-        | ERROR
-          
-          ;
+        | error ';' {  };
+
+method_declaration  : OBJECTID '(' formal_list_asterisk ')' ':' TYPEID '{' expr '}'
+                      {
+                        $$ = method($1, $3, $6, $8);
+                      };
+    
+attribute_declaration : OBJECTID ':' TYPEID
+                        {
+                          $$ = attr($1, $3, no_expr());
+                        }
+                      | OBJECTID ':' TYPEID ASSIGN '{' expr '}'
+                        {
+                          $$ = attr($1, $3, $6);
+                        }
+                      | OBJECTID ':' TYPEID ASSIGN expr
+                        {
+                          $$ = attr($1, $3, $5);
+                        };
 
 formal_list_asterisk  : formal_list_plus
                         {
@@ -248,9 +260,9 @@ formal_list_asterisk  : formal_list_plus
                           $$ = nil_Formals();
                         };
 
-formal_list_plus  : formal ',' formal_list_plus
+formal_list_plus  : formal_list_plus ',' formal
                     {
-                      $$ = append_Formals(single_Formals($1), $3);
+                      $$ = append_Formals($1, single_Formals($3));
                     }
                   | formal 
                     {
@@ -282,11 +294,8 @@ expr_list_plus  : nonempty_expression ';'
                 | nonempty_expression ';' expr_list_plus
                   {
                     $$ = append_Expressions(single_Expressions($1), $3);
-                  }
-                | ERROR
-                
-                ;
-  // Cases
+                  };
+
 case_list : case_list case ';'
             {
               $$ = append_Cases($1, single_Cases($2));
@@ -298,11 +307,10 @@ case_list : case_list case ';'
 
 case  : OBJECTID ':' TYPEID DARROW expr
         {
-          
           $$ = branch($1, $3, $5);
         };
         
-  // Let
+
 inner_let : OBJECTID ':' TYPEID ASSIGN expr IN expr
             {
               $$ = let($1, $3, $5, $7);
@@ -318,7 +326,8 @@ inner_let : OBJECTID ':' TYPEID ASSIGN expr IN expr
           | OBJECTID ':' TYPEID ',' inner_let
             {
               $$ = let($1, $3, no_expr(), $5);
-            };
+            }
+          | error ',' { yyerrok; }
 
 expr  : nonempty_expression
         {
@@ -429,22 +438,19 @@ nonempty_expression : OBJECTID ASSIGN nonempty_expression
                       {
                         $$ = string_const($1);
                       }
-                    | ERROR 
-                    
-                    ;
+                    | error 
+                      { 
+                        
+                      };
 
 while_expression  : WHILE nonempty_expression LOOP expr POOL
                     {
                       $$ = loop($2, $4);
-                    }
-                  | WHILE nonempty_expression LOOP ERROR
-                    {
-                      
                     };
 
 /* end of grammar */
 %%
-    
+
 /* This function is called automatically when Bison detects a parse error. */
 void yyerror(char *s)
 {
@@ -458,5 +464,5 @@ void yyerror(char *s)
   
   if(omerrs>50) {fprintf(stdout, "More than 50 errors\n"); exit(1);}
 }
-    
-    
+
+
