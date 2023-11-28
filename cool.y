@@ -158,7 +158,7 @@
     
 /* Precedence declarations go here. */
 
-%right ASSIGN
+%left ASSIGN
 %left NOT
 %nonassoc LE '<' '='
 %left '+' '-'
@@ -242,10 +242,6 @@ attribute_declaration : OBJECTID ':' TYPEID
                         {
                           $$ = attr($1, $3, no_expr());
                         }
-                      | OBJECTID ':' TYPEID ASSIGN '{' expr '}'
-                        {
-                          $$ = attr($1, $3, $6);
-                        }
                       | OBJECTID ':' TYPEID ASSIGN expr
                         {
                           $$ = attr($1, $3, $5);
@@ -294,8 +290,10 @@ expr_list_plus  : nonempty_expression ';'
                 | nonempty_expression ';' expr_list_plus
                   {
                     $$ = append_Expressions(single_Expressions($1), $3);
-                  };
-
+                  }
+                | ERROR
+                
+                ;
 case_list : case_list case ';'
             {
               $$ = append_Cases($1, single_Cases($2));
@@ -446,8 +444,10 @@ nonempty_expression : OBJECTID ASSIGN nonempty_expression
 while_expression  : WHILE nonempty_expression LOOP expr POOL
                     {
                       $$ = loop($2, $4);
-                    };
-
+                    }
+                    | WHILE nonempty_expression LOOP error 
+                    {}
+                    ;
 /* end of grammar */
 %%
 
