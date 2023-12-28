@@ -83,6 +83,9 @@ virtual void assign_types(TypeEnvironment) = 0;
 void dump_with_types(ostream&,int);    \
 void assign_types(TypeEnvironment); 
 
+#define method_EXTRAS \
+Symbol get_name() { return name; }
+
 
 #define Formal_EXTRAS                              \
 virtual void dump_with_types(ostream&,int) = 0; \

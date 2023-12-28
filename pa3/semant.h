@@ -5,6 +5,7 @@
 #include <iostream>
 #include <map> 
 #include <set>
+#include <list>
 #include "cool-tree.h"
 #include "stringtab.h"
 #include "symtab.h"
@@ -35,6 +36,9 @@ public:
   ostream& semant_error();
   ostream& semant_error(Class_ c);
   ostream& semant_error(Symbol filename, tree_node *t);
+
+  Symbol lub (Symbol A, Symbol B, const TypeEnvironment& typeenv);
+  std::list<Symbol> get_parents(Symbol A, const TypeEnvironment& typeenv);
 };
 
 struct TypeEnvironment {

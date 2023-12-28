@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <list>
 #include "semant.h"
 #include "utilities.h"
 
@@ -225,6 +226,46 @@ ostream &ClassTable::semant_error()
     semant_errors++;
     return error_stream;
 }
+
+std::list<Symbol> ClassTable::get_parents(Symbol A, const TypeEnvironment& typeenv)
+{
+    if (A == SELF_TYPE) {
+        A = typeenv.curr_class->get_name();
+    }
+
+    std::list<Symbol> parents;
+
+    // note that Object's father is No_class
+    for (; A != No_class; A = m_classes[A]->get_parent()) {
+        parents.push_front(A);
+    }
+
+    return parents;
+}
+
+Symbol ClassTable::lub(Symbol A, Symbol B, const TypeEnvironment& typeenv)
+{
+    std::list<Symbol> path1 = get_parents(A, typeenv);
+    std::list<Symbol> path2 = get_parents(B, typeenv);
+
+    Symbol ret;
+    std::list<Symbol>::iterator iter1 = path1.begin(),
+        iter2 = path2.begin();
+
+    while (iter1 != path1.end() && iter2 != path2.end()) {
+        if (*iter1 == *iter2) {
+            ret = *iter1;
+        } else {
+            break;
+        }
+
+        iter1++;
+        iter2++;
+    }
+
+    return ret;
+}
+
 
 /*   This is the entry point to the semantic checker.
 
@@ -583,7 +624,23 @@ Symbol loop_class::assign_types(TypeEnvironment typeenv) {
     return type;
 }
 
-Symbol cond_class::assign_types(TypeEnvironment typeenv) {}
+Symbol cond_class::assign_types(TypeEnvironment typeenv) {
+     if (pred->assign_types(typeenv) != Bool) {
+        typeenv.class_table->semant_error(typeenv.curr_class) << "Error! Predicate should be Boolean!" << std::endl;
+    }
+
+    Symbol then_type = then_exp->assign_types(typeenv);
+    Symbol else_type = else_exp->assign_types(typeenv);
+
+    if (else_type == No_type) {
+        // if there is no 'else'
+        type = then_type;
+    } else {
+        type = typeenv.class_table->lub(then_type, else_type, typeenv);
+    }
+    return type;
+
+}
 Symbol dispatch_class::assign_types(TypeEnvironment typeenv) {}
 Symbol static_dispatch_class::assign_types(TypeEnvironment typeenv) {}
 Symbol assign_class::assign_types(TypeEnvironment typeenv) {}
