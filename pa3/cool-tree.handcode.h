@@ -5,9 +5,12 @@
 #define COOL_TREE_HANDCODE_H
 
 #include <iostream>
+#include <map>
 #include "tree.h"
 #include "cool.h"
 #include "stringtab.h"
+#include "symtab.h"
+
 #define yylineno curr_lineno;
 extern int yylineno;
 
@@ -44,6 +47,10 @@ typedef Expressions_class *Expressions;
 typedef list_node<Case> Cases_class;
 typedef Cases_class *Cases;
 
+// In order to add methods to the M (methods) table
+class method_class;
+typedef SymbolTable<Symbol, method_class> MethodTable;
+
 struct TypeEnvironment;
 
 #define Program_EXTRAS                          \
@@ -74,17 +81,29 @@ void dump_with_types(ostream&,int);   \
 void assign_types(TypeEnvironment);                   
 
 
-#define Feature_EXTRAS                                        \
+#define Feature_EXTRAS \
 virtual void dump_with_types(ostream&,int) = 0; \
-virtual void assign_types(TypeEnvironment) = 0; 
+virtual void assign_types(TypeEnvironment) = 0; \
+virtual void add_method_to_table(std::map<Symbol, MethodTable>& method_table, Symbol class_name) = 0; \
+virtual void add_attribute_to_table(TypeEnvironment& typeenv) = 0;
 
 
 #define Feature_SHARED_EXTRAS                                       \
 void dump_with_types(ostream&,int);    \
-void assign_types(TypeEnvironment); 
+void assign_types(TypeEnvironment); \
+
 
 #define method_EXTRAS \
-Symbol get_name() { return name; }
+Symbol get_name() { return name; } \
+Formals get_formals() { return formals; } \
+Symbol get_return_type() { return return_type; } \
+void add_method_to_table(std::map<Symbol, MethodTable>& method_table, Symbol class_name); \
+void add_attribute_to_table(TypeEnvironment& typeenv) { }
+
+
+#define attr_EXTRAS \
+void add_method_to_table(std::map<Symbol, MethodTable>& method_table, Symbol class_name) {} \
+void add_attribute_to_table(TypeEnvironment& typeenv);
 
 
 #define Formal_EXTRAS                              \
@@ -98,12 +117,20 @@ void dump_with_types(ostream&,int); \
 Symbol get_name() { return name; } \
 Symbol get_type() { return type_decl; } 
 
+
 #define Case_EXTRAS                             \
-virtual void dump_with_types(ostream& ,int) = 0;
+virtual void dump_with_types(ostream& ,int) = 0; \
+virtual Symbol assign_types (TypeEnvironment) = 0;
 
 
 #define branch_EXTRAS                                   \
-void dump_with_types(ostream& ,int);
+void dump_with_types(ostream& ,int); \
+Symbol get_type_decl() { return type_decl; } \
+virtual Symbol assign_types(TypeEnvironment);
+
+
+#define typecase_EXTRAS \
+Symbol assign_types(TypeEnvironment);
 
 
 #define Expression_EXTRAS                    \

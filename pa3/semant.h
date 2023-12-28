@@ -37,8 +37,14 @@ public:
   ostream& semant_error(Class_ c);
   ostream& semant_error(Symbol filename, tree_node *t);
 
+  // find most common ancestor
   Symbol lub (Symbol A, Symbol B, const TypeEnvironment& typeenv);
+  
+  // get parents list of class
   std::list<Symbol> get_parents(Symbol A, const TypeEnvironment& typeenv);
+
+  // check if the inheritance is valid
+  bool check_inheritance(Symbol ancestor, Symbol child, const TypeEnvironment& typeenv);
 };
 
 struct TypeEnvironment {

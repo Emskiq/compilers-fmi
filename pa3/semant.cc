@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <list>
+#include <vector>
 #include "semant.h"
 #include "utilities.h"
 
@@ -85,6 +86,7 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0), error_stream(cerr)
 {
     install_basic_classes();
     /* Fill this in */
+
 }
 
 void ClassTable::install_basic_classes()
@@ -195,6 +197,19 @@ void ClassTable::install_basic_classes()
     m_classes.insert(std::make_pair(Str, Str_class));
 }
 
+static void add_class_methods(std::map<Symbol, MethodTable>& method_tables, ClassTable& class_table)
+{
+    for (auto iter = class_table.m_classes.begin(); iter != class_table.m_classes.end(); ++iter) {
+        Symbol class_name = iter->first;
+        method_tables[class_name].enterscope();
+        Features curr_features = class_table.m_classes[class_name]->get_features();
+        for (int j = curr_features->first(); curr_features->more(j); j = curr_features->next(j)) {
+             Feature curr_feature = curr_features->nth(j);
+             curr_feature->add_method_to_table(method_tables, class_name);
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////
 //
 // semant_error is an overloaded function for reporting errors
@@ -266,6 +281,25 @@ Symbol ClassTable::lub(Symbol A, Symbol B, const TypeEnvironment& typeenv)
     return ret;
 }
 
+bool ClassTable::check_inheritance(Symbol ancestor, Symbol child, const TypeEnvironment& typeenv)
+{
+    if (ancestor == SELF_TYPE) {
+        return child == SELF_TYPE;
+    }
+
+    if (child == SELF_TYPE) {
+        child = typeenv.curr_class->get_name();
+    }
+
+    for (; child != No_class; child = m_classes.find(child)->second->get_parent()) {
+        if (child == ancestor) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
 
 /*   This is the entry point to the semantic checker.
 
@@ -332,13 +366,44 @@ void program_class::assign_types(TypeEnvironment typeenv)
         }
     }
 
-    // todo
-
     for (int i = classes->first(); classes->more(i); i = classes->next(i))
     {
+        // Emo: Add class attributes to Type Env (O) and then to the
+        //      type analisys
         typeenv.curr_class = classes->nth(i);
-        classes->nth(i)->assign_types(typeenv);
+
+        // Get the inheritance parents, add all the attributes.
+        std::list<Symbol> parents = typeenv.class_table->get_parents(typeenv.curr_class->get_name(), typeenv);
+        for (auto iter = parents.begin(); iter != parents.end(); iter++) {
+            typeenv.curr_class = typeenv.class_table->m_classes[*iter];
+            Features curr_features = typeenv.curr_class->get_features();
+            typeenv.O->enterscope();
+            for (int j = curr_features->first(); curr_features->more(j); j = curr_features->next(j)) {
+                Feature curr_feature = curr_features->nth(j);
+                curr_feature->add_attribute_to_table(typeenv);
+            }
+        }
+
+        typeenv.curr_class = classes->nth(i);
+        Features curr_features = typeenv.curr_class->get_features();
+
+        // Check all features.
+        // Emo: Actuall type analysis
+        for (int j = curr_features->first(); curr_features->more(j); j = curr_features->next(j)) {
+            Feature curr_feature = curr_features->nth(j);
+            curr_feature->assign_types(typeenv);
+        }
+
+        for (int j = 0; j < parents.size(); ++j) {
+            typeenv.O->exitscope();
+        }
     }
+
+    // for (int i = classes->first(); classes->more(i); i = classes->next(i))
+    // {
+    //     typeenv.curr_class = classes->nth(i);
+    //     classes->nth(i)->assign_types(typeenv);
+    // }
 }
 
 void class__class::assign_types(TypeEnvironment typeenv)
@@ -347,6 +412,11 @@ void class__class::assign_types(TypeEnvironment typeenv)
     {
         features->nth(i)->assign_types(typeenv);
     }
+}
+
+void method_class::add_method_to_table(std::map<Symbol, MethodTable>& method_table, Symbol class_name)
+{
+    method_table[class_name].addid(name, new method_class(copy_Symbol(name), formals->copy_list(), copy_Symbol(return_type), expr->copy_Expression()));
 }
 
 void method_class::assign_types(TypeEnvironment typeenv)
@@ -394,30 +464,23 @@ void method_class::assign_types(TypeEnvironment typeenv)
     expr->assign_types(typeenv);
 }
 
-void attr_class::assign_types(TypeEnvironment typeenv) 
+void attr_class::add_attribute_to_table(TypeEnvironment& typeenv)
 {
+    // First check for errors
+    if (name == self) {
+        typeenv.class_table->semant_error(typeenv.curr_class) << "Error! 'self' cannot be the name of an attribute in class " << typeenv.curr_class->get_name() << std::endl;
+    }
+    if (typeenv.O->lookup(name) != NULL) {
+        typeenv.class_table->semant_error(typeenv.curr_class) << "Error! attribute '" << name << "' already exists!" << std::endl;
+        return;
+    }
 
-    // Symbol target_class_name = NULL;
+    // if everything went fine add the attribute
+    typeenv.O->addid(name, new Symbol(type_decl));
+}
 
-    // for (const auto& kv : typeenv.class_table->m_classes) {
-    //     if (kv.second == typeenv.curr_class) {
-    //         target_class_name = kv.first;
-    //         break; 
-    //     }
-    // }
-
-    // if (name == self) {
-    //     typeenv.class_table->semant_error(typeenv.curr_class) << "Error! 'self' cannot be the name of an attribute in class " << target_class_name << std::endl;
-    // }
-    // if (typeenv.O->lookup(name) != NULL) {
-    //     typeenv.class_table->semant_error(typeenv.curr_class) << "Error! attribute '" << name << "' already exists!" << std::endl;
-    //     return;
-    // }
-
-    // typeenv.O->addid(name, new Symbol(type_decl));
-    // typeenv.O->enterscope();
-    // init->assign_types(typeenv);
-    // typeenv.O->exitscope();
+void attr_class::assign_types(TypeEnvironment typeenv)
+{
     init->assign_types(typeenv);
 }
 
@@ -442,9 +505,9 @@ Symbol let_class::assign_types(TypeEnvironment typeenv)
 
     Symbol init_type = init->assign_types(typeenv);
     if (init_type != No_type) {
-        // if (classtable->CheckInheritance(type_decl, init_type) == false) {
-        //     classtable->semant_error(curr_class) << "Error! init value is not child." << std::endl;
-        // }
+        if (typeenv.class_table->check_inheritance(type_decl, init_type, typeenv) == false) {
+            typeenv.class_table->semant_error(typeenv.curr_class) << "Error! init value is not child." << std::endl;
+        }
     }
 
     body->assign_types(typeenv);
@@ -613,7 +676,48 @@ Symbol plus_class::assign_types(TypeEnvironment typeenv) {
     return type;
 }
 
-Symbol typcase_class::assign_types(TypeEnvironment typeenv) {}
+Symbol branch_class::assign_types(TypeEnvironment typeenv)
+{
+    typeenv.O->enterscope();
+
+    typeenv.O->addid(name, new Symbol(type_decl));
+    Symbol type = expr->assign_types(typeenv);
+
+    typeenv.O->exitscope();
+
+    return type;
+}
+
+Symbol typcase_class::assign_types(TypeEnvironment typeenv) {
+    Symbol expr_type = expr->assign_types(typeenv);
+
+    Case branch;
+    std::vector<Symbol> branch_types;
+    std::vector<Symbol> branch_type_decls;
+
+    for (int i = cases->first(); cases->more(i); i = cases->next(i)) {
+        branch = cases->nth(i);
+
+        Symbol branch_type = branch->assign_types(typeenv);
+        branch_types.push_back(branch_type);
+
+        branch_type_decls.push_back(((branch_class *)branch)->get_type_decl());
+    }
+
+    for (int i = 0; i < branch_types.size() - 1; ++i) {
+        for (int j = i + 1; j < branch_types.size(); ++j) {
+            if (branch_type_decls[i] == branch_type_decls[j]) {
+                typeenv.class_table->semant_error(typeenv.curr_class) << "Error! Two branches have same type." << std::endl;
+            }
+        }
+    }
+
+    type = branch_types[0];
+    for (int i = 1; i < branch_types.size(); ++i) {
+        type = typeenv.class_table->lub(type, branch_types[i], typeenv);
+    }
+    return type;
+}
 
 Symbol loop_class::assign_types(TypeEnvironment typeenv) {
     if (pred->assign_types(typeenv) != Bool) {
@@ -633,7 +737,6 @@ Symbol cond_class::assign_types(TypeEnvironment typeenv) {
     Symbol else_type = else_exp->assign_types(typeenv);
 
     if (else_type == No_type) {
-        // if there is no 'else'
         type = then_type;
     } else {
         type = typeenv.class_table->lub(then_type, else_type, typeenv);
@@ -641,9 +744,120 @@ Symbol cond_class::assign_types(TypeEnvironment typeenv) {
     return type;
 
 }
-Symbol dispatch_class::assign_types(TypeEnvironment typeenv) {}
-Symbol static_dispatch_class::assign_types(TypeEnvironment typeenv) {}
-Symbol assign_class::assign_types(TypeEnvironment typeenv) {}
+
+Symbol dispatch_class::assign_types(TypeEnvironment typeenv) {
+    bool error = false;
+
+    Symbol expr_type = expr->assign_types(typeenv);
+
+    // Find the method along the inheritance path.
+    // We want the definition in a subclass.
+    std::list<Symbol> path = typeenv.class_table->get_parents(expr_type, typeenv);
+    method_class* method = NULL;
+
+    for (auto iter = path.begin(); iter != path.end(); ++iter) {
+        if ((method = typeenv.M->operator[] (*iter).lookup(name)) != NULL) {
+            break;
+        }
+    }
+
+    if (method == NULL) {
+        error = true;
+        typeenv.class_table->semant_error(typeenv.curr_class) << "Error! Cannot find method '" << name << "'" << std::endl;
+    }
+
+    // Check the params.
+    for (int i = actual->first(); actual->more(i); i = actual->next(i)) {
+        Symbol actual_type = actual->nth(i)->assign_types(typeenv);
+        if (method != NULL) {
+            Symbol formal_type = method->get_formals()->nth(i)->get_type();
+            if (typeenv.class_table->check_inheritance(formal_type, actual_type, typeenv) == false) {
+                typeenv.class_table->semant_error(typeenv.curr_class) << "Error! Actual type " << actual_type << " doesn't suit formal type " << formal_type << std::endl;
+                error = true;
+            }
+        }
+    }
+
+    if (error) {
+        type = Object;
+    } else {
+        type = method->get_return_type();
+        if (type == SELF_TYPE) {
+            type = expr_type;
+        }
+    }
+
+    return type;
+}
+
+Symbol static_dispatch_class::assign_types(TypeEnvironment typeenv) {
+    bool error = false;
+
+    Symbol expr_class = expr->assign_types(typeenv);
+
+    if (typeenv.class_table->check_inheritance(type_name, expr_class, typeenv) == false) {
+        error = true;
+        typeenv.class_table->semant_error(typeenv.curr_class) << "Error! Static dispatch class is not an ancestor." << std::endl;
+    }
+
+    // Find the method along the inheritance path.
+    // We want the definition in a subclass.
+    std::list<Symbol> path = typeenv.class_table->get_parents(type_name, typeenv);
+    method_class* method = NULL;
+    for (auto iter = path.begin(); iter != path.end(); ++iter) {
+        if ((method = typeenv.M->operator[] (*iter).lookup(name)) != NULL) {
+            break;
+        }
+    }
+
+    if (method == NULL) {
+        error = true;
+        typeenv.class_table->semant_error(typeenv.curr_class) << "Error! Cannot find method '" << name << "'" << std::endl;
+    }
+
+    // Check the params.
+    for (int i = actual->first(); actual->more(i); i = actual->next(i)) {
+        Symbol actual_type = actual->nth(i)->assign_types(typeenv);
+        if (method != NULL) {
+            Symbol formal_type = method->get_formals()->nth(i)->get_type();
+            if (typeenv.class_table->check_inheritance(formal_type, actual_type, typeenv) == false) {
+                typeenv.class_table->semant_error(typeenv.curr_class) << "Error! Actual type " << actual_type << " doesn't suit formal type " << formal_type << std::endl;
+                error = true;
+            }
+        }
+    }
+
+    if (error) {
+        type = Object;
+    } else {
+        type = method->get_return_type();
+        if (type == SELF_TYPE) {
+            type = type_name;
+        }
+    }
+
+    return type;
+
+}
+
+Symbol assign_class::assign_types(TypeEnvironment typeenv) {
+    Symbol* lvalue_type = typeenv.O->lookup(name);
+
+    Symbol rvalue_type = expr->assign_types(typeenv);
+
+    if (lvalue_type == NULL) {
+        typeenv.class_table->semant_error(typeenv.curr_class) << "Error! Cannot find lvalue " << name << std::endl;
+        type = Object;
+        return type;
+    }
+    if (typeenv.class_table->check_inheritance(*lvalue_type, rvalue_type, typeenv) == false) {
+        typeenv.class_table->semant_error(typeenv.curr_class) << "Error! lvalue is not an ancestor of rvalue. " << std::endl;
+        type = Object;
+        return type;
+    }
+    type = rvalue_type;
+    return type;
+}
 
 void program_class::semant()
 {
@@ -654,9 +868,16 @@ void program_class::semant()
 
     /* some semantic analysis code may go here */
     SymbolTable<Symbol, Symbol> O;
-    TypeEnvironment typeenv{ nullptr, &O, nullptr, class_table};
+    std::map <Symbol, MethodTable> M;
 
+    TypeEnvironment typeenv { nullptr, &O, &M, class_table};
+
+    // Add all defined methods in M (method table)
+    add_class_methods(M, *class_table);
+
+    // Type analysis
     assign_types(typeenv);
+
     if (class_table->errors())
     {
         cerr << "Compilation halted due to static semantic errors." << endl;
