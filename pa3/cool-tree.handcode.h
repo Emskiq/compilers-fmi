@@ -51,63 +51,90 @@ virtual void semant() = 0;			\
 virtual void dump_with_types(ostream&, int) = 0; \
 virtual void assign_types(TypeEnvironment) = 0;
 
-
-
 #define program_EXTRAS                          \
 void semant();     				\
-void dump_with_types(ostream&, int);            \
-void assign_types(TypeEnvironment);
+void dump_with_types(ostream&, int);   \
+void assign_types(TypeEnvironment);         
 
 #define Class__EXTRAS                   \
 virtual Symbol get_filename() = 0;      \
-virtual void dump_with_types(ostream&,int) = 0;  \
-virtual void assign_types(TypeEnvironment) = 0;
+virtual Symbol get_parent() = 0;      \
+virtual Symbol get_name() = 0;      \
+virtual Features get_features() = 0;      \
+virtual Formals get_formals(Symbol) = 0; \
+virtual Symbol get_return_type(Symbol) = 0; \
+virtual void init_class(TypeEnvironment) = 0; \
+virtual void dump_with_types(ostream&,int) = 0; \
+virtual void assign_types(TypeEnvironment) = 0; 
 
 
 #define class__EXTRAS                                 \
 Symbol get_filename() { return filename; }             \
-void dump_with_types(ostream&,int);                    \
-void assign_types(TypeEnvironment);
+Symbol get_parent() { return parent; }             \
+Symbol get_name() { return name; }             \
+Features get_features() { return features; }             \
+Formals get_formals(Symbol); \
+Symbol get_return_type(Symbol); \
+void init_class(TypeEnvironment); \
+void dump_with_types(ostream&,int);   \
+void assign_types(TypeEnvironment);                   
 
 
 #define Feature_EXTRAS                                        \
-virtual void dump_with_types(ostream&,int) = 0; \ 
-virtual void assign_types(TypeEnvironment) = 0;
+virtual void dump_with_types(ostream&,int) = 0; \
+virtual void assign_types(TypeEnvironment) = 0; \
+virtual void add_to_environment(TypeEnvironment) = 0; \
+virtual bool isMethod() = 0; \
+virtual Formals get_formals() = 0; \
+virtual Symbol get_return_type() = 0; \
+virtual Symbol get_name() = 0; 
+
 
 #define Feature_SHARED_EXTRAS                                       \
 void dump_with_types(ostream&,int);    \
-void assign_types(TypeEnvironment);
-
-
+void assign_types(TypeEnvironment); \
+void add_to_environment(TypeEnvironment); \
+bool isMethod(); \
+Formals get_formals(); \
+Symbol get_return_type(); \
+Symbol get_name(); \
 
 
 #define Formal_EXTRAS                              \
-virtual void dump_with_types(ostream&,int) = 0;
+virtual void dump_with_types(ostream&,int) = 0; \
+virtual void assign_types(TypeEnvironment) = 0; \
+virtual Symbol get_name() = 0; \
+virtual Symbol get_type() = 0; 
 
 
 #define formal_EXTRAS                           \
-void dump_with_types(ostream&,int);
-
+void dump_with_types(ostream&,int); \
+void assign_types(TypeEnvironment); \
+Symbol get_name() { return name; } \
+Symbol get_type() { return type_decl; } 
 
 #define Case_EXTRAS                             \
-virtual void dump_with_types(ostream& ,int) = 0;
+virtual void dump_with_types(ostream& ,int) = 0; \
+virtual Symbol assign_types(TypeEnvironment) = 0; \
+virtual Symbol get_type() = 0; 
 
 
 #define branch_EXTRAS                                   \
-void dump_with_types(ostream& ,int);
-
+void dump_with_types(ostream& ,int); \
+Symbol assign_types(TypeEnvironment); \
+Symbol get_type() { return type_decl; } 
 
 #define Expression_EXTRAS                    \
 Symbol type;                                 \
 Symbol get_type() { return type; }           \
 Expression set_type(Symbol s) { type = s; return this; } \
 virtual void dump_with_types(ostream&,int) = 0;  \
-virtual void assign_types(TypeEnvironment) = 0; \
+virtual Symbol assign_types(TypeEnvironment) = 0; \
 void dump_type(ostream&, int);               \
 Expression_class() { type = (Symbol) NULL; }
 
 #define Expression_SHARED_EXTRAS           \
 void dump_with_types(ostream&,int); \
-void assign_types(TypeEnvironment);
+Symbol assign_types(TypeEnvironment); 
 
 #endif
