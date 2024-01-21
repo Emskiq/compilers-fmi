@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdio.h>
+#include <stack>
 #include "emit.h"
 #include "cool-tree.h"
 #include "symtab.h"
@@ -31,6 +32,21 @@ private:
    void code_bools(int);
    void code_select_gc();
    void code_constants();
+
+   void code_protoobject(CgenNodeP nd);
+   void code_protoobjects();
+
+   void code_initializers();
+   void code_initializer(CgenNodeP nd);
+
+   void code_method(CgenNodeP nd, method_class* m);
+   void code_class_methods(CgenNodeP nd);
+   void code_all_methods();
+
+   // The following methods help extract information
+   // about a given class.
+   int get_class_tag(CgenNodeP nd);
+   int get_numof_attrs(CgenNodeP nd);
 
 // The following creates an inheritance graph from
 // a list of classes.  The graph is implemented as
