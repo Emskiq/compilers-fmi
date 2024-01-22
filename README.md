@@ -11,3 +11,4 @@ Each assignment has its dedicated folder within this repository:
 - **pa1:** Lexical Analyzer
 - **pa2:** Syntactic Analyzer
 - **pa3:** Semantic Analyzer
+- **pa4:** Code generator
